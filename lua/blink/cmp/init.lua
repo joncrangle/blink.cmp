@@ -21,6 +21,7 @@ cmp.setup = function(opts)
     -- trigger controls when to show the window and the current context for caching
     -- TODO: add first_trigger event for setting up the rest of the plugin
     cmp.trigger = require('blink.cmp.trigger.completion').activate_autocmds()
+    cmp.trigger = require('blink.cmp.trigger.cmdline').activate_autocmds()
 
     -- sources fetch autocomplete items, documentation and signature help
     cmp.sources = require('blink.cmp.sources.lib')

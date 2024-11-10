@@ -342,7 +342,7 @@ local config = {
   sources = {
     -- list of enabled providers
     completion = {
-      enabled_providers = { 'lsp', 'path', 'snippets', 'buffer' },
+      enabled_providers = { 'lsp', 'path', 'snippets', 'buffer', 'cmdline' },
     },
 
     -- table of providers to configure
@@ -365,6 +365,10 @@ local config = {
         name = 'Buffer',
         module = 'blink.cmp.sources.buffer',
         fallback_for = { 'lsp' },
+      },
+      cmdline = {
+        name = 'Cmdline',
+        module = 'blink.cmp.sources.cmdline',
       },
     },
   },
