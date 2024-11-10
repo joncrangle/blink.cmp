@@ -34,30 +34,30 @@ function trigger.activate_autocmds()
       if vim.snippet.active() and not config.show_in_snippet and not trigger.context then
         return
 
-      -- we were told to ignore the text changed event, so we update the context
-      -- but don't send an on_show event upstream
+        -- we were told to ignore the text changed event, so we update the context
+        -- but don't send an on_show event upstream
       elseif trigger.ignore_next_text_changed then
         if trigger.context ~= nil then trigger.show({ send_upstream = false }) end
         trigger.ignore_next_text_changed = false
 
-      -- no characters added so let cursormoved handle it
+        -- no characters added so let cursormoved handle it
       elseif last_char == '' then
         return
 
-      -- ignore if in a special buffer
+        -- ignore if in a special buffer
       elseif utils.is_blocked_buffer() then
         trigger.hide()
 
-      -- character forces a trigger according to the sources, create a fresh context
+        -- character forces a trigger according to the sources, create a fresh context
       elseif vim.tbl_contains(sources.get_trigger_characters(), last_char) then
         trigger.context = nil
         trigger.show({ trigger_character = last_char })
 
-      -- character is part of the current context OR in an existing context
+        -- character is part of the current context OR in an existing context
       elseif last_char:match(config.keyword_regex) ~= nil then
         trigger.show()
 
-      -- nothing matches so hide
+        -- nothing matches so hide
       else
         trigger.hide()
       end
@@ -86,12 +86,12 @@ function trigger.activate_autocmds()
       local char_under_cursor = vim.api.nvim_get_current_line():sub(cursor_col, cursor_col)
       local is_on_trigger = vim.tbl_contains(sources.get_trigger_characters(), char_under_cursor)
       local is_on_trigger_for_show_on_insert = is_on_trigger
-        and not vim.tbl_contains(config.show_on_x_blocked_trigger_characters, char_under_cursor)
+          and not vim.tbl_contains(config.show_on_x_blocked_trigger_characters, char_under_cursor)
       local is_on_context_char = char_under_cursor:match(config.keyword_regex) ~= nil
 
       local insert_enter_on_trigger_character = config.show_on_insert_on_trigger_character
-        and is_on_trigger_for_show_on_insert
-        and ev.event == 'InsertEnter'
+          and is_on_trigger_for_show_on_insert
+          and ev.event == 'InsertEnter'
 
       -- check if we're still within the bounds of the query used for the context
       if trigger.within_query_bounds(vim.api.nvim_win_get_cursor(0)) then
@@ -122,6 +122,46 @@ function trigger.activate_autocmds()
       last_char = ''
       trigger.hide()
     end,
+  })
+
+  vim.api.nvim_create_autocmd('CmdlineEnter', {
+    callback = function()
+      trigger.context = nil
+    end
+  })
+
+  vim.api.nvim_create_autocmd('CmdlineChanged', {
+    callback = function()
+      local cmdline = vim.fn.getcmdline()
+      if cmdline == '' then
+        trigger.hide()
+        return
+      end
+
+      local cmdpos = vim.fn.getcmdpos()
+
+      local char_under_cursor = cmdpos <= #cmdline and cmdline:sub(cmdpos, cmdpos) or ''
+      local prev_char = cmdpos > 1 and cmdline:sub(cmdpos - 1, cmdpos - 1) or ''
+
+      local is_on_trigger = vim.tbl_contains(sources.get_trigger_characters(), char_under_cursor)
+      local is_completing_word = prev_char:match(config.keyword_regex) ~= nil
+
+      if is_on_trigger or is_completing_word then
+        trigger.context = nil
+        trigger.show({ trigger_character = is_on_trigger and char_under_cursor or nil })
+      else
+        trigger.hide()
+      end
+
+      last_char = ''
+    end
+  })
+
+  vim.api.nvim_create_autocmd('CmdlineLeave', {
+    callback = function()
+      last_char = ''
+      trigger.hide()
+    end
   })
 
   -- manually hide when exiting insert mode with ctrl+c, since it doesn't trigger InsertLeave
@@ -158,7 +198,7 @@ function trigger.suppress_events_for_callback(cb)
   trigger.ignore_next_text_changed = changed_tick_after ~= changed_tick_before and is_insert_mode
   -- TODO: does this guarantee that the CursorMovedI event will fire?
   trigger.ignore_next_cursor_moved = (cursor_after[1] ~= cursor_before[1] or cursor_after[2] ~= cursor_before[2])
-    and is_insert_mode
+      and is_insert_mode
 end
 
 --- @param opts { is_accept?: boolean } | nil
@@ -168,7 +208,7 @@ function trigger.show_if_on_trigger_character(opts)
   local cursor_col = vim.api.nvim_win_get_cursor(0)[2]
   local char_under_cursor = vim.api.nvim_get_current_line():sub(cursor_col, cursor_col)
   local is_on_trigger = vim.tbl_contains(sources.get_trigger_characters(), char_under_cursor)
-    and not vim.tbl_contains(config.show_on_x_blocked_trigger_characters, char_under_cursor)
+      and not vim.tbl_contains(config.show_on_x_blocked_trigger_characters, char_under_cursor)
 
   if is_on_trigger then trigger.show({ trigger_character = char_under_cursor }) end
   return is_on_trigger
@@ -178,13 +218,17 @@ end
 function trigger.show(opts)
   opts = opts or {}
 
-  local cursor = vim.api.nvim_win_get_cursor(0)
+  local is_cmdline = function() return vim.api.nvim_get_mode().mode == 'c' end
+
+  local cursor = is_cmdline() and { 1, vim.fn.getcmdpos() } or vim.api.nvim_win_get_cursor(0)
+  local line = is_cmdline() and vim.fn.getcmdline() or vim.api.nvim_buf_get_lines(0, cursor[1] - 1, cursor[1], false)[1]
+  local bufnr = is_cmdline() and -1 or vim.api.nvim_get_current_buf()
   -- already triggered at this position, ignore
   if
-    not opts.force
-    and trigger.context ~= nil
-    and cursor[1] == trigger.context.cursor[1]
-    and cursor[2] == trigger.context.cursor[2]
+      not opts.force
+      and trigger.context ~= nil
+      and cursor[1] == trigger.context.cursor[1]
+      and cursor[2] == trigger.context.cursor[2]
   then
     return
   end
@@ -193,13 +237,13 @@ function trigger.show(opts)
   if trigger.context == nil then trigger.current_context_id = trigger.current_context_id + 1 end
   trigger.context = {
     id = trigger.current_context_id,
-    bufnr = vim.api.nvim_get_current_buf(),
+    bufnr = bufnr,
     cursor = cursor,
-    line = vim.api.nvim_buf_get_lines(0, cursor[1] - 1, cursor[1], false)[1],
+    line = line,
     bounds = trigger.get_context_bounds(config.keyword_regex),
     trigger = {
       kind = opts.trigger_character and vim.lsp.protocol.CompletionTriggerKind.TriggerCharacter
-        or vim.lsp.protocol.CompletionTriggerKind.Invoked,
+          or vim.lsp.protocol.CompletionTriggerKind.Invoked,
       character = opts.trigger_character,
     },
   }

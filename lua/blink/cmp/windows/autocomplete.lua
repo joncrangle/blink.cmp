@@ -217,7 +217,7 @@ function autocomplete.select(line, skip_auto_insert)
     require('blink.cmp.trigger.completion').suppress_events_for_callback(function()
       if autocomplete.preview_context_id ~= autocomplete.context.id then autocomplete.preview_text_edit = nil end
       autocomplete.preview_text_edit =
-        require('blink.cmp.accept.preview')(selected_item, autocomplete.preview_text_edit)
+          require('blink.cmp.accept.preview')(selected_item, autocomplete.preview_text_edit)
       autocomplete.preview_context_id = autocomplete.context.id
     end)
   end
